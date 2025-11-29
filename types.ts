@@ -1,3 +1,4 @@
+
 export interface Subject {
   id: string;
   name: string;
@@ -45,6 +46,7 @@ export enum AppView {
   MNEMONIC_MAKER = 'MNEMONIC_MAKER',
   CALCULATOR = 'CALCULATOR',
   PREDICTIONS = 'PREDICTIONS',
+  VISUALIZER = 'VISUALIZER',
 }
 
 export interface EssayFeedback {

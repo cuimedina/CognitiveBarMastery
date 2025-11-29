@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Dashboard } from './components/Dashboard';
 import { SubjectExplorer } from './components/SubjectExplorer';
@@ -10,8 +11,9 @@ import { MBEPatternTracker } from './components/MBEPatternTracker';
 import { MnemonicMaker } from './components/MnemonicMaker';
 import { Predictions } from './components/Predictions';
 import { ScoreCalculator } from './components/ScoreCalculator';
+import { ConceptVisualizer } from './components/ConceptVisualizer';
 import { AppView } from './types';
-import { LayoutDashboard, BookOpen, PenTool, Lightbulb, GraduationCap, Microscope, Calendar, Bookmark, CheckSquare, BrainCircuit, Sparkles, Calculator } from 'lucide-react';
+import { LayoutDashboard, BookOpen, PenTool, Lightbulb, GraduationCap, Microscope, Calendar, Bookmark, CheckSquare, BrainCircuit, Sparkles, Calculator, Video } from 'lucide-react';
 
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<AppView>(AppView.DASHBOARD);
@@ -29,6 +31,7 @@ const App: React.FC = () => {
       case AppView.MNEMONIC_MAKER: return <MnemonicMaker />;
       case AppView.PREDICTIONS: return <Predictions />;
       case AppView.CALCULATOR: return <ScoreCalculator />;
+      case AppView.VISUALIZER: return <ConceptVisualizer />;
       default: return <Dashboard />;
     }
   };
@@ -73,6 +76,7 @@ const App: React.FC = () => {
           <NavItem view={AppView.ESSAY_LAB} icon={PenTool} label="Essay Lab" />
           <NavItem view={AppView.PREDICTIONS} icon={Sparkles} label="Predictions" />
           <NavItem view={AppView.CALCULATOR} icon={Calculator} label="Score Calculator" />
+          <NavItem view={AppView.VISUALIZER} icon={Video} label="Concept Visualizer" />
           
           <div className="mt-8 px-4 py-2 text-xs font-bold text-slate-500 uppercase tracking-wider">Resources</div>
           <NavItem view={AppView.STRATEGIES} icon={Lightbulb} label="Learning Science" />
@@ -102,6 +106,7 @@ const App: React.FC = () => {
             {currentView === AppView.MNEMONIC_MAKER && 'Mnemonic Generator'}
             {currentView === AppView.PREDICTIONS && 'Exam Predictions'}
             {currentView === AppView.CALCULATOR && 'Score Scenario Planner'}
+            {currentView === AppView.VISUALIZER && 'Legal Concept Visualizer'}
           </h2>
           <div className="flex items-center space-x-4">
              <div className="text-right hidden md:block">

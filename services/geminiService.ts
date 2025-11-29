@@ -4,8 +4,7 @@ import { IssueAnalysis, EssayFeedback, ExamAnalysisResult, GlobalSubjectStat, Ru
 
 // Initialize Gemini
 // Note: The API key is injected via vite.config.ts 'define' based on the Vercel Environment Variable
-const apiKey = process.env.API_KEY || ''; 
-const ai = new GoogleGenAI({ apiKey });
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 const issueAnalysisSchema: Schema = {
   type: Type.OBJECT,
@@ -388,6 +387,48 @@ export const GeminiService = {
     } catch (error) {
       console.error("Prediction Error", error);
       return [];
+    }
+  },
+
+  /**
+   * Generate a video to visualize a legal concept.
+   */
+  async generateLegalVideo(prompt: string, aspectRatio: '16:9' | '9:16'): Promise<string> {
+    // Check if the user needs to select an API key first (specific to Veo)
+    if (window.aistudio && window.aistudio.openSelectKey) {
+      const hasKey = await window.aistudio.hasSelectedApiKey();
+      if (!hasKey) {
+        await window.aistudio.openSelectKey();
+      }
+    }
+
+    // Create a fresh instance for this call as per instructions for Veo/Paid features
+    const veAoAi = new GoogleGenAI({ apiKey: process.env.API_KEY });
+
+    try {
+      let operation = await veAoAi.models.generateVideos({
+        model: 'veo-3.1-fast-generate-preview',
+        prompt: `A realistic and clear visual representation of the following legal concept or fact pattern for educational purposes: ${prompt}`,
+        config: {
+          numberOfVideos: 1,
+          resolution: '1080p',
+          aspectRatio: aspectRatio,
+        }
+      });
+
+      // Polling loop
+      while (!operation.done) {
+        await new Promise(resolve => setTimeout(resolve, 5000)); // Poll every 5 seconds
+        operation = await veAoAi.operations.getVideosOperation({ operation: operation });
+      }
+
+      const videoUri = operation.response?.generatedVideos?.[0]?.video?.uri;
+      if (!videoUri) throw new Error("No video URI returned");
+
+      return `${videoUri}&key=${process.env.API_KEY}`;
+    } catch (error) {
+      console.error("Video Generation Error", error);
+      throw error;
     }
   }
 };
