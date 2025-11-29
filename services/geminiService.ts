@@ -1,208 +1,133 @@
-// OLD (from my last message – causes the error)
-// import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, Type, Schema } from "@google/genai";
+import { SYSTEM_INSTRUCTION_ANALYZER, SYSTEM_INSTRUCTION_GRADER, SYSTEM_INSTRUCTION_EXAM_PARSER, SYSTEM_INSTRUCTION_RULE_MAKER, SYSTEM_INSTRUCTION_PLAIN_ENGLISH, SYSTEM_INSTRUCTION_MBE_ANALYZER, SYSTEM_INSTRUCTION_MNEMONIC_MAKER, SYSTEM_INSTRUCTION_PREDICTOR } from "../constants";
+import { IssueAnalysis, EssayFeedback, ExamAnalysisResult, GlobalSubjectStat, RuleGeneration, MBEAnalysis, MnemonicResult, Prediction } from "../types";
 
-// NEW – use the package you actually have installed
-import { GoogleGenerativeAI as GoogleGenAI } from "@google/generative-ai";import {
-  SYSTEM_INSTRUCTION_ANALYZER,
-  SYSTEM_INSTRUCTION_GRADER,
-  SYSTEM_INSTRUCTION_EXAM_PARSER,
-  SYSTEM_INSTRUCTION_RULE_MAKER,
-  SYSTEM_INSTRUCTION_PLAIN_ENGLISH,
-  SYSTEM_INSTRUCTION_MBE_ANALYZER,
-  SYSTEM_INSTRUCTION_MNEMONIC_MAKER,
-  SYSTEM_INSTRUCTION_PREDICTOR,
-} from "../constants";
-import {
-  IssueAnalysis,
-  EssayFeedback,
-  ExamAnalysisResult,
-  GlobalSubjectStat,
-  RuleGeneration,
-  MBEAnalysis,
-  MnemonicResult,
-  Prediction,
-} from "../types";
+// Initialize Gemini
+// Note: The API key is injected via vite.config.ts 'define' based on the Vercel Environment Variable
+const apiKey = process.env.API_KEY || ''; 
+const ai = new GoogleGenAI({ apiKey });
 
-// --------- API KEY (no hard-coding!) ----------
-// At build/runtime this comes from your .env / Vercel env vars
-const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-
-// Don’t crash the whole app if the key is missing – just disable Gemini.
-if (!apiKey) {
-  console.warn("VITE_GEMINI_API_KEY is not set. Gemini features will be disabled.");
-}
-
-const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
-
-// ---------- JSON Schemas (no Schema/Type symbols) ----------
-
-const issueAnalysisSchema = {
-  type: "object",
+const issueAnalysisSchema: Schema = {
+  type: Type.OBJECT,
   properties: {
-    issueName: { type: "string" },
-    frequency: { type: "string", enum: ["High", "Medium", "Low"] },
-    triggerFacts: { type: "array", items: { type: "string" } },
-    ruleFramework: { type: "string" },
-    commonMistakes: { type: "array", items: { type: "string" } },
+    issueName: { type: Type.STRING },
+    frequency: { type: Type.STRING, enum: ["High", "Medium", "Low"] },
+    triggerFacts: { type: Type.ARRAY, items: { type: Type.STRING } },
+    ruleFramework: { type: Type.STRING },
+    commonMistakes: { type: Type.ARRAY, items: { type: Type.STRING } },
   },
   required: ["issueName", "frequency", "triggerFacts", "ruleFramework"],
-} as const;
+};
 
-const essayFeedbackSchema = {
-  type: "object",
+const essayFeedbackSchema: Schema = {
+  type: Type.OBJECT,
   properties: {
-    score: { type: "integer", description: "Score between 40 and 100" },
-    strengths: { type: "array", items: { type: "string" } },
-    weaknesses: { type: "array", items: { type: "string" } },
-    missedIssues: { type: "array", items: { type: "string" } },
-    modelParagraph: {
-      type: "string",
-      description: "A rewritten perfect paragraph for the weakest section",
-    },
+    score: { type: Type.INTEGER, description: "Score between 40 and 100" },
+    strengths: { type: Type.ARRAY, items: { type: Type.STRING } },
+    weaknesses: { type: Type.ARRAY, items: { type: Type.STRING } },
+    missedIssues: { type: Type.ARRAY, items: { type: Type.STRING } },
+    modelParagraph: { type: Type.STRING, description: "A rewritten perfect paragraph for the weakest section" },
   },
   required: ["score", "strengths", "weaknesses", "missedIssues"],
-} as const;
+};
 
-const examAnalysisSchema = {
-  type: "object",
+const examAnalysisSchema: Schema = {
+  type: Type.OBJECT,
   properties: {
-    examDate: { type: "string" },
+    examDate: { type: Type.STRING },
     questions: {
-      type: "array",
+      type: Type.ARRAY,
       items: {
-        type: "object",
+        type: Type.OBJECT,
         properties: {
-          number: { type: "string" },
-          subject: { type: "string" },
-          issues: { type: "array", items: { type: "string" } },
-          triggerFacts: { type: "array", items: { type: "string" } },
-          rulesExtracted: { type: "array", items: { type: "string" } },
-        },
-      },
-    },
-  },
-} as const;
+          number: { type: Type.STRING },
+          subject: { type: Type.STRING },
+          issues: { type: Type.ARRAY, items: { type: Type.STRING } },
+          triggerFacts: { type: Type.ARRAY, items: { type: Type.STRING } },
+          rulesExtracted: { type: Type.ARRAY, items: { type: Type.STRING } },
+        }
+      }
+    }
+  }
+};
 
-const globalStatsSchema = {
-  type: "array",
+const globalStatsSchema: Schema = {
+  type: Type.ARRAY,
   items: {
-    type: "object",
+    type: Type.OBJECT,
     properties: {
-      subject: { type: "string" },
-      frequency: {
-        type: "integer",
-        description: "Percentage appearance in past 10 years (0-100)",
-      },
-      trend: { type: "string", enum: ["Up", "Down", "Stable"] },
-    },
-  },
-} as const;
+      subject: { type: Type.STRING },
+      frequency: { type: Type.INTEGER, description: "Percentage appearance in past 10 years (0-100)" },
+      trend: { type: Type.STRING, enum: ["Up", "Down", "Stable"] }
+    }
+  }
+};
 
-const ruleGenerationSchema = {
-  type: "object",
+const ruleGenerationSchema: Schema = {
+  type: Type.OBJECT,
   properties: {
-    topic: { type: "string" },
-    ruleStatement: {
-      type: "string",
-      description: "A concise paragraph suitable for memorization",
-    },
-    elements: {
-      type: "array",
-      items: { type: "string" },
-      description: "Breakdown of elements",
-    },
-    pastExams: {
-      type: "array",
-      items: { type: "string" },
-      description: "List of specific CA Bar exams (Month Year) where this was tested",
-    },
-    usageNotes: {
-      type: "string",
-      description: "Tips on when to apply this rule",
-    },
+    topic: { type: Type.STRING },
+    ruleStatement: { type: Type.STRING, description: "A concise paragraph suitable for memorization" },
+    elements: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Breakdown of elements" },
+    pastExams: { type: Type.ARRAY, items: { type: Type.STRING }, description: "List of specific CA Bar exams (Month Year) where this was tested" },
+    usageNotes: { type: Type.STRING, description: "Tips on when to apply this rule" }
   },
-  required: ["ruleStatement", "elements", "pastExams"],
-} as const;
+  required: ["ruleStatement", "elements", "pastExams"]
+};
 
-const mbeAnalysisSchema = {
-  type: "object",
+const mbeAnalysisSchema: Schema = {
+  type: Type.OBJECT,
   properties: {
-    concept: { type: "string", description: "The name of the rule/concept" },
-    definition: { type: "string", description: "Brief definition" },
-    triggerFacts: {
-      type: "array",
-      items: { type: "string" },
-      description: "Bullet points of facts from the question",
-    },
-    commonTraps: {
-      type: "array",
-      items: { type: "string" },
-      description: "Explanation of traps or why other answers are wrong",
-    },
+    concept: { type: Type.STRING, description: "The name of the rule/concept" },
+    definition: { type: Type.STRING, description: "Brief definition" },
+    triggerFacts: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Bullet points of facts from the question" },
+    commonTraps: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Explanation of traps or why other answers are wrong" },
   },
-  required: ["concept", "definition", "triggerFacts", "commonTraps"],
-} as const;
+  required: ["concept", "definition", "triggerFacts", "commonTraps"]
+};
 
-const mnemonicSchema = {
-  type: "object",
+const mnemonicSchema: Schema = {
+  type: Type.OBJECT,
   properties: {
-    acronym: { type: "string" },
-    breakdown: { type: "array", items: { type: "string" } },
-    visualHook: {
-      type: "string",
-      description: "Description of a mental image",
-    },
-    catchphrase: { type: "string" },
+    acronym: { type: Type.STRING },
+    breakdown: { type: Type.ARRAY, items: { type: Type.STRING } },
+    visualHook: { type: Type.STRING, description: "Description of a mental image" },
+    catchphrase: { type: Type.STRING },
   },
-  required: ["acronym", "breakdown", "visualHook"],
-} as const;
+  required: ["acronym", "breakdown", "visualHook"]
+};
 
-const predictionSchema = {
-  type: "array",
+const predictionSchema: Schema = {
+  type: Type.ARRAY,
   items: {
-    type: "object",
+    type: Type.OBJECT,
     properties: {
-      subject: { type: "string" },
-      probability: { type: "string", enum: ["High", "Medium", "Low"] },
-      reasoning: { type: "string" },
-      lastTested: { type: "string" },
+      subject: { type: Type.STRING },
+      probability: { type: Type.STRING, enum: ["High", "Medium", "Low"] },
+      reasoning: { type: Type.STRING },
+      lastTested: { type: Type.STRING }
     },
-    required: ["subject", "probability", "reasoning"],
-  },
-} as const;
-
-// ------------- Service ----------------
+    required: ["subject", "probability", "reasoning"]
+  }
+};
 
 export const GeminiService = {
+  /**
+   * Analyzes a subject to find high-yield patterns.
+   */
   async analyzeSubject(subjectName: string): Promise<IssueAnalysis[]> {
-  // If Gemini isn't configured, don't crash the app – just return an empty list.
-  if (!ai) {
-    console.warn("Gemini not configured – analyzeSubject skipped.");
-    return [];
-  }
-
-  try {
-    const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: `Analyze the California Bar Exam subject: ${subjectName}. Identify the top 5 most tested issues.`,
-      config: {
-        systemInstruction: SYSTEM_INSTRUCTION_ANALYZER,
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: "array",
-          items: issueAnalysisSchema,
+    try {
+      const response = await ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: `Analyze the California Bar Exam subject: ${subjectName}. Identify the top 5 most tested issues.`,
+        config: {
+          systemInstruction: SYSTEM_INSTRUCTION_ANALYZER,
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.ARRAY,
+            items: issueAnalysisSchema,
+          },
         },
-      },
-    });
-
-    const text = response.text;
-    if (!text) return [];
-    return JSON.parse(text) as IssueAnalysis[];
-  } catch (error) {
-    console.error("Gemini Analysis Error:", error);
-    throw error;
-  }
-},,
       });
 
       const text = response.text;
@@ -214,11 +139,10 @@ export const GeminiService = {
     }
   },
 
-  async gradeEssay(
-    subject: string,
-    question: string,
-    answer: string
-  ): Promise<EssayFeedback> {
+  /**
+   * Grades a user's practice essay.
+   */
+  async gradeEssay(subject: string, question: string, answer: string, fileData?: { inlineData: { data: string; mimeType: string } }): Promise<EssayFeedback> {
     try {
       const prompt = `
       Subject: ${subject}
@@ -226,9 +150,13 @@ export const GeminiService = {
       Student Answer: ${answer}
       `;
 
+      const contents = fileData 
+        ? [{ text: prompt }, fileData] 
+        : prompt;
+
       const response = await ai.models.generateContent({
         model: "gemini-2.5-flash",
-        contents: prompt,
+        contents: contents,
         config: {
           systemInstruction: SYSTEM_INSTRUCTION_GRADER,
           responseMimeType: "application/json",
@@ -245,45 +173,40 @@ export const GeminiService = {
     }
   },
 
+  /**
+   * Generates a practice question.
+   */
   async generateQuestion(subject: string): Promise<string> {
-  // Prevent app crash if API key isn't loaded
-  if (!ai) {
-    console.warn("Gemini not configured – generateQuestion skipped.");
-    return "AI is not configured yet. Please add your API key in Vercel.";
-  }
-
-  try {
-    const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: `Generate a short, difficult California Bar Exam style essay prompt for ${subject}. Focus on a high-frequency issue. Just output the fact pattern.`,
-    });
-
-    return response.text || "Could not generate question.";
-  } catch (error) {
-    console.error("Generate Question Error:", error);
-    return "Error generating question. Please try again.";
-  }
-},
-
-  async analyzeExamDump(
-    text: string,
-    fileData?: { inlineData: { data: string; mimeType: string } }
-  ): Promise<ExamAnalysisResult> {
     try {
-      const contents = fileData
-        ? [{ text: `Analyze this exam text content.` }, fileData]
+      const response = await ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: `Generate a short, difficult California Bar Exam style essay prompt for ${subject}. Focus on a high-frequency issue. Just output the fact pattern.`,
+      });
+      return response.text || "Could not generate question.";
+    } catch (error) {
+      return "Error generating question. Please try again.";
+    }
+  },
+
+  /**
+   * Analyzes raw exam text to find patterns.
+   */
+  async analyzeExamDump(text: string, fileData?: { inlineData: { data: string; mimeType: string } }): Promise<ExamAnalysisResult> {
+    try {
+      const contents = fileData 
+        ? [{ text: `Analyze this exam text content.` }, fileData] 
         : `Analyze this exam text content: ${text.substring(0, 30000)}`;
 
       const response = await ai.models.generateContent({
         model: "gemini-2.5-flash",
-        contents,
+        contents: contents, 
         config: {
           systemInstruction: SYSTEM_INSTRUCTION_EXAM_PARSER,
           responseMimeType: "application/json",
           responseSchema: examAnalysisSchema,
-        },
+        }
       });
-
+      
       const responseText = response.text;
       if (!responseText) throw new Error("No response from AI");
       return JSON.parse(responseText) as ExamAnalysisResult;
@@ -293,11 +216,10 @@ export const GeminiService = {
     }
   },
 
-  async generateWeeklySchedule(
-    phase: string,
-    hours: number,
-    subjects: string[]
-  ): Promise<string> {
+  /**
+   * Generates a weekly schedule based on phase and hours.
+   */
+  async generateWeeklySchedule(phase: string, hours: number, subjects: string[]): Promise<string> {
     try {
       const response = await ai.models.generateContent({
         model: "gemini-2.5-flash",
@@ -306,20 +228,22 @@ export const GeminiService = {
         Parameters:
         - Phase: ${phase}
         - Total Hours: ${hours} hours for this week.
-        - Focus Subjects: ${subjects.join(", ")}
+        - Focus Subjects: ${subjects.join(', ')}
         - Methodology: Use Interleaving (mix subjects), Active Recall (no passive reading), and Spaced Repetition via MBEs.
-        - IMPORTANT: The student prefers Multiple Choice Questions (MBE) over flashcards. Do not suggest flashcards.
+        - IMPORTANT: The student prefers Multiple Choice Questions (MBE) over flashcards. Do not suggest flashcards. Suggest "MBE Practice Set (30min)" instead.
         - STRATEGY: Ensure Professional Responsibility (PR) is studied at least twice this week regardless of phase.
         
         Output a simple day-by-day plan (Monday-Sunday) in Markdown format. Include specific tasks like "Timed Essay (1hr)", "MBE Practice Set (30min)".`,
       });
       return response.text || "Unable to generate schedule.";
     } catch (error) {
-      console.error("Weekly Schedule Error:", error);
       return "Error generating schedule.";
     }
   },
 
+  /**
+   * Gets global stats for all subjects.
+   */
   async getGlobalExamStats(): Promise<GlobalSubjectStat[]> {
     try {
       const response = await ai.models.generateContent({
@@ -330,10 +254,10 @@ export const GeminiService = {
         config: {
           responseMimeType: "application/json",
           responseSchema: globalStatsSchema,
-        },
+        }
       });
       const text = response.text;
-      if (!text) return [];
+      if(!text) return [];
       return JSON.parse(text) as GlobalSubjectStat[];
     } catch (error) {
       console.error("Global Stats Error", error);
@@ -341,10 +265,10 @@ export const GeminiService = {
     }
   },
 
-  async generateRuleWithHistory(
-    topic: string,
-    fileData?: { inlineData: { data: string; mimeType: string } }
-  ): Promise<RuleGeneration> {
+  /**
+   * Generate a specific rule with history.
+   */
+  async generateRuleWithHistory(topic: string, fileData?: { inlineData: { data: string; mimeType: string } }): Promise<RuleGeneration> {
     try {
       const contents = fileData
         ? [{ text: `Generate a California Bar Exam rule for this content. Cite specific past exams.` }, fileData]
@@ -352,12 +276,12 @@ export const GeminiService = {
 
       const response = await ai.models.generateContent({
         model: "gemini-2.5-flash",
-        contents,
+        contents: contents,
         config: {
           systemInstruction: SYSTEM_INSTRUCTION_RULE_MAKER,
           responseMimeType: "application/json",
           responseSchema: ruleGenerationSchema,
-        },
+        }
       });
       const text = response.text;
       if (!text) throw new Error("No response");
@@ -368,6 +292,9 @@ export const GeminiService = {
     }
   },
 
+  /**
+   * Translate legal analysis to plain english.
+   */
   async getPlainEnglishExplanation(analysisJson: string): Promise<string> {
     try {
       const response = await ai.models.generateContent({
@@ -376,19 +303,18 @@ export const GeminiService = {
         Explain the patterns found here in plain English. Why did the triggers lead to the rules? Explain the logic simply.`,
         config: {
           systemInstruction: SYSTEM_INSTRUCTION_PLAIN_ENGLISH,
-        },
+        }
       });
       return response.text || "Could not translate.";
     } catch (error) {
-      console.error("Plain English Error:", error);
       return "Error translating to plain English.";
     }
   },
 
-  async analyzeMBEQuestion(
-    questionText: string,
-    fileData?: { inlineData: { data: string; mimeType: string } }
-  ): Promise<MBEAnalysis> {
+  /**
+   * Analyze an MBE Question for Pattern Tracker
+   */
+  async analyzeMBEQuestion(questionText: string, fileData?: { inlineData: { data: string; mimeType: string } }): Promise<MBEAnalysis> {
     try {
       const contents = fileData
         ? [{ text: `Analyze this MBE Question.` }, fileData]
@@ -396,26 +322,26 @@ export const GeminiService = {
 
       const response = await ai.models.generateContent({
         model: "gemini-2.5-flash",
-        contents,
+        contents: contents,
         config: {
           systemInstruction: SYSTEM_INSTRUCTION_MBE_ANALYZER,
           responseMimeType: "application/json",
           responseSchema: mbeAnalysisSchema,
-        },
+        }
       });
       const text = response.text;
       if (!text) throw new Error("No response");
       return JSON.parse(text) as MBEAnalysis;
     } catch (error) {
-      console.error("MBE Analysis Error:", error);
+      console.error("MBE Analysis Error", error);
       throw error;
     }
   },
 
-  async generateMnemonic(
-    input: string,
-    fileData?: { inlineData: { data: string; mimeType: string } }
-  ): Promise<MnemonicResult> {
+  /**
+   * Generate Mnemonic
+   */
+  async generateMnemonic(input: string, fileData?: { inlineData: { data: string; mimeType: string } }): Promise<MnemonicResult> {
     try {
       const contents = fileData
         ? [{ text: `Create a mnemonic for these items.` }, fileData]
@@ -423,12 +349,12 @@ export const GeminiService = {
 
       const response = await ai.models.generateContent({
         model: "gemini-2.5-flash",
-        contents,
+        contents: contents,
         config: {
           systemInstruction: SYSTEM_INSTRUCTION_MNEMONIC_MAKER,
           responseMimeType: "application/json",
           responseSchema: mnemonicSchema,
-        },
+        }
       });
       const text = response.text;
       if (!text) throw new Error("No response");
@@ -439,6 +365,9 @@ export const GeminiService = {
     }
   },
 
+  /**
+   * Get Exam Predictions
+   */
   async getExamPredictions(): Promise<Prediction[]> {
     try {
       const response = await ai.models.generateContent({
@@ -451,7 +380,7 @@ export const GeminiService = {
           systemInstruction: SYSTEM_INSTRUCTION_PREDICTOR,
           responseMimeType: "application/json",
           responseSchema: predictionSchema,
-        },
+        }
       });
       const text = response.text;
       if (!text) return [];
@@ -460,5 +389,5 @@ export const GeminiService = {
       console.error("Prediction Error", error);
       return [];
     }
-  },
+  }
 };
