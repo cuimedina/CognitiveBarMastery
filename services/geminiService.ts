@@ -175,18 +175,34 @@ const predictionSchema = {
 
 export const GeminiService = {
   async analyzeSubject(subjectName: string): Promise<IssueAnalysis[]> {
-    try {
-      const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
-        contents: `Analyze the California Bar Exam subject: ${subjectName}. Identify the top 5 most tested issues.`,
-        config: {
-          systemInstruction: SYSTEM_INSTRUCTION_ANALYZER,
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: "array",
-            items: issueAnalysisSchema,
-          },
+  // If Gemini isn't configured, don't crash the app – just return an empty list.
+  if (!ai) {
+    console.warn("Gemini not configured – analyzeSubject skipped.");
+    return [];
+  }
+
+  try {
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: `Analyze the California Bar Exam subject: ${subjectName}. Identify the top 5 most tested issues.`,
+      config: {
+        systemInstruction: SYSTEM_INSTRUCTION_ANALYZER,
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: "array",
+          items: issueAnalysisSchema,
         },
+      },
+    });
+
+    const text = response.text;
+    if (!text) return [];
+    return JSON.parse(text) as IssueAnalysis[];
+  } catch (error) {
+    console.error("Gemini Analysis Error:", error);
+    throw error;
+  }
+},,
       });
 
       const text = response.text;
