@@ -1,4 +1,4 @@
-import { GoogleGenAI, Type, Schema } from "@google/genai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import { SYSTEM_INSTRUCTION_ANALYZER, SYSTEM_INSTRUCTION_GRADER, SYSTEM_INSTRUCTION_EXAM_PARSER, SYSTEM_INSTRUCTION_RULE_MAKER, SYSTEM_INSTRUCTION_PLAIN_ENGLISH, SYSTEM_INSTRUCTION_MBE_ANALYZER, SYSTEM_INSTRUCTION_MNEMONIC_MAKER, SYSTEM_INSTRUCTION_PREDICTOR } from "../constants";
 import { IssueAnalysis, EssayFeedback, ExamAnalysisResult, GlobalSubjectStat, RuleGeneration, MBEAnalysis, MnemonicResult, Prediction } from "../types";
 
