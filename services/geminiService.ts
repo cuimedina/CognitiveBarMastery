@@ -246,17 +246,24 @@ export const GeminiService = {
   },
 
   async generateQuestion(subject: string): Promise<string> {
-    try {
-      const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
-        contents: `Generate a short, difficult California Bar Exam style essay prompt for ${subject}. Focus on a high-frequency issue. Just output the fact pattern.`,
-      });
-      return response.text || "Could not generate question.";
-    } catch (error) {
-      console.error("Generate Question Error:", error);
-      return "Error generating question. Please try again.";
-    }
-  },
+  // Prevent app crash if API key isn't loaded
+  if (!ai) {
+    console.warn("Gemini not configured – generateQuestion skipped.");
+    return "AI is not configured yet. Please add your API key in Vercel.";
+  }
+
+  try {
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: `Generate a short, difficult California Bar Exam style essay prompt for ${subject}. Focus on a high-frequency issue. Just output the fact pattern.`,
+    });
+
+    return response.text || "Could not generate question.";
+  } catch (error) {
+    console.error("Generate Question Error:", error);
+    return "Error generating question. Please try again.";
+  }
+},
 
   async analyzeExamDump(
     text: string,
