@@ -1,5 +1,8 @@
-import { GoogleGenAI } from "@google/genai";
-import {
+// OLD (from my last message – causes the error)
+// import { GoogleGenAI } from "@google/genai";
+
+// NEW – use the package you actually have installed
+import { GoogleGenerativeAI as GoogleGenAI } from "@google/generative-ai";import {
   SYSTEM_INSTRUCTION_ANALYZER,
   SYSTEM_INSTRUCTION_GRADER,
   SYSTEM_INSTRUCTION_EXAM_PARSER,
