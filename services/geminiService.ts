@@ -27,12 +27,12 @@ import {
 // At build/runtime this comes from your .env / Vercel env vars
 const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
 
+// Don’t crash the whole app if the key is missing – just disable Gemini.
 if (!apiKey) {
-  throw new Error("VITE_GEMINI_API_KEY is not defined. Set it in .env and Vercel.");
+  console.warn("VITE_GEMINI_API_KEY is not set. Gemini features will be disabled.");
 }
 
-// Gemini client
-const ai = new GoogleGenAI({ apiKey });
+const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
 
 // ---------- JSON Schemas (no Schema/Type symbols) ----------
 
